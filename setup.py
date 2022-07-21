@@ -1,9 +1,7 @@
 from setuptools import setup, find_packages
 
-from .pypxst import __version__
-
 setup(
     name='pypxst',
-    version = __version__,
+    version = '0.0.0',
     packages=find_packages()
 )
