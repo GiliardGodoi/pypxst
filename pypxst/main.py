@@ -1,15 +1,15 @@
+import networkx as nx
 import random
 
 from disjointset import DisjointSet
-from ggraphs import UndirectedGraph as UGraph
 
 
 def check_portals(portals, disjoint):
-    '''Verifica se os vértices portais de um segmento
+    """Verifica se os vértices portais de um segmento
     se conectam à mesma partição de vértices comuns.
 
     Faz essa verificação em tempo O(n)
-    '''
+    """
     f_check = set()
 
     for p in portals:
@@ -22,6 +22,7 @@ def check_portals(portals, disjoint):
 
     return True
 
+
 def get_dict_matches_from(partitions, disjoint):
     matches = dict()
     for partition in partitions:
@@ -29,9 +30,10 @@ def get_dict_matches_from(partitions, disjoint):
         matches[key] = partition
     return matches
 
+
 def select_partition_and_union(selected, red_dict, blue_dict, disjoint, matches):
     for key in matches:
-        red_p  = red_dict.pop(key)
+        red_p = red_dict.pop(key)
         blue_p = blue_dict.pop(key)
 
         choosed = None
@@ -56,6 +58,7 @@ def select_partition_and_union(selected, red_dict, blue_dict, disjoint, matches)
 
     return selected, red_dict, blue_dict, disjoint
 
+
 class Partition:
     def __init__(self):
         self.edges = set()
@@ -66,7 +69,7 @@ class Partition:
         return len(self.edges)
 
     def __str__(self):
-        return f'Partition <{self.portal}>'
+        return f"Partition <{self.portal}>"
 
     def __repr__(self):
         return self.__str__()
@@ -81,16 +84,16 @@ class Partition:
     def add(self, v, u):
         self.edges.add((v, u))
 
-class PartitionCrossoverSteinerTree:
 
-    def __init__(self, stpg) -> None:
-        self.STPG = stpg
-        self.GRAPH = stpg.graph
+class PartitionCrossoverSteinerTree:
+    def __init__(self, G: nx.Graph, terminals) -> None:
+        self.G = G
+        self.terminals = terminals
 
     def f_weight(self, v, u):
-        if self.GRAPH is None:
+        if self.G is None:
             raise AttributeError("GRAPH shouldn't be None")
-        return self.GRAPH.weight(v, u)
+        return self.G[v][u]["weight"]
 
     def find_partitions(self, subgraph, specific_nodes):
         visited = set()
@@ -111,7 +114,7 @@ class PartitionCrossoverSteinerTree:
                 visited.add(u)
                 if u not in specific_nodes:
                     counter = 0
-                    for w in subgraph.adjacent_to(u):
+                    for w in subgraph.adj[u]:
                         if w not in visited:
                             stack_inner.append(w)
                             partition.add(u, w)
@@ -130,37 +133,36 @@ class PartitionCrossoverSteinerTree:
             s = stack_outter.pop()
 
             visited.add(s)
-            for v in subgraph.adjacent_to(s):
+            for v in subgraph.adj[s]:
                 if v not in visited:
                     seg = search(s, v)
                     result.append(seg)
 
         return result
 
-    def __call__(self, red : UGraph, blue : UGraph):
+    def __call__(self, red: nx.Graph, blue: nx.Graph) -> nx.Graph:
 
-        red_only  = UGraph()
-        blue_only = UGraph()
+        red_only = nx.Graph()
+        blue_only = nx.Graph()
 
-        common_vertices = set(red.vertices) & set(blue.vertices)
+        common_vertices = set(red.nodes) & set(blue.nodes)
         common_edges = set()
 
-        for v, u in red.gen_undirect_edges():
+        for v, u in red.edges:
             if blue.has_edge(v, u):
                 common_edges.add((v, u))
             else:
                 red_only.add_edge(v, u)
 
-        for v, u in blue.gen_undirect_edges():
+        for v, u in blue.edges:
             if not red.has_edge(v, u):
                 blue_only.add_edge(v, u)
 
-
-        for v in red_only.vertices:
-            if (red.degree(v) == 1) and (v not in self.STPG.terminals):
+        for v in red_only.nodes:
+            if (red.degree(v) == 1) and (v not in self.terminals):
                 common_vertices.add(v)
-        for v in blue_only.vertices:
-            if blue.degree(v) == 1 and (v not in self.STPG.terminals):
+        for v in blue_only.nodes:
+            if blue.degree(v) == 1 and (v not in self.terminals):
                 common_vertices.add(v)
 
         disjoint = DisjointSet()
@@ -169,26 +171,28 @@ class PartitionCrossoverSteinerTree:
         for v, u in common_edges:
             disjoint.union(v, u)
 
-        common_nodes_red = set(red_only.vertices) & common_vertices
-        common_nodes_blue = set(blue_only.vertices) & common_vertices
+        common_nodes_red = set(red_only.nodes) & common_vertices
+        common_nodes_blue = set(blue_only.nodes) & common_vertices
 
-        red_partitions  = self.find_partitions(red_only, common_nodes_red)
+        red_partitions = self.find_partitions(red_only, common_nodes_red)
         blue_partitions = self.find_partitions(blue_only, common_nodes_blue)
 
-        red_dict  = get_dict_matches_from(red_partitions, disjoint)
+        red_dict = get_dict_matches_from(red_partitions, disjoint)
         blue_dict = get_dict_matches_from(blue_partitions, disjoint)
-        matches   = red_dict.keys() & blue_dict.keys()
+        matches = red_dict.keys() & blue_dict.keys()
 
         selected = list()
 
         while matches:
-            selected, red_dict, blue_dict, disjoint = select_partition_and_union(selected, red_dict, blue_dict, disjoint, matches)
-            red_dict  = get_dict_matches_from(red_dict.values(), disjoint)
+            selected, red_dict, blue_dict, disjoint = select_partition_and_union(
+                selected, red_dict, blue_dict, disjoint, matches
+            )
+            red_dict = get_dict_matches_from(red_dict.values(), disjoint)
             blue_dict = get_dict_matches_from(blue_dict.values(), disjoint)
             matches = red_dict.keys() & blue_dict.keys()
 
-        red_child  = UGraph()
-        blue_child = UGraph()
+        red_child = nx.Graph()
+        blue_child = nx.Graph()
 
         for v, u in common_edges:
             red_child.add_edge(v, u)
@@ -208,6 +212,7 @@ class PartitionCrossoverSteinerTree:
                 blue_child.add_edge(v, u)
 
         return red_child, blue_child
+
 
 if __name__ == "__main__":
     pass
